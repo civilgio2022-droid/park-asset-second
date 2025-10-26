@@ -23,7 +23,10 @@
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/"
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "jspdf": "https://aistudiocdn.com/jspdf@^3.0.3",
+    "jspdf-autotable": "https://aistudiocdn.com/jspdf-autotable@^5.0.2",
+    "papaparse": "https://aistudiocdn.com/papaparse@^5.5.3"
   }
 }
 </script>
@@ -43,19 +46,21 @@
       measurementId: "G-Q2JNB48PDZ"
     };
 
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
+    // Initialize Firebase and attach to window
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
     window.database = firebase.database();
     window.storage = firebase.storage();
   </script>
   
   <!-- Application Scripts -->
-  <script type="text/babel" src="types.ts"></script>
-  <script type="text/babel" src="components/AssetRegistration.tsx"></script>
-  <script type="text/babel" src="components/AssetInquiry.tsx"></script>
-  <script type="text/babel" src="components/ReportGeneration.tsx"></script>
-  <script type="text/babel" src="App.tsx"></script>
-  <script type="text/babel" src="index.tsx"></script>
+  <script type="text/babel" data-presets="react,typescript" src="types.ts"></script>
+  <script type="text/babel" data-presets="react,typescript" src="components/AssetRegistration.tsx"></script>
+  <script type="text/babel" data-presets="react,typescript" src="components/AssetInquiry.tsx"></script>
+  <script type="text/babel" data-presets="react,typescript" src="components/ReportGeneration.tsx"></script>
+  <script type="text/babel" data-presets="react,typescript" src="App.tsx"></script>
+  <script type="text/babel" data-presets="react,typescript" src="index.tsx"></script>
 
 </body>
 </html>

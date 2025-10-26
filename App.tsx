@@ -1,8 +1,7 @@
-// Fix: Add imports for React, child components, and the ParkAsset type.
 import React from 'react';
-import AssetRegistration from './components/AssetRegistration';
-import AssetInquiry from './components/AssetInquiry';
-import ReportGeneration from './components/ReportGeneration';
+import { AssetRegistration } from './components/AssetRegistration';
+import { AssetInquiry } from './components/AssetInquiry';
+import { ReportGeneration } from './components/ReportGeneration';
 import { ParkAsset } from './types';
 
 const App = () => {
@@ -45,12 +44,17 @@ const App = () => {
   const handleDeleteAsset = (assetId: string) => {
     if (window.confirm('정말로 이 자산을 삭제하시겠습니까?')) {
       const assetRef = database.ref(`assets/${assetId}`);
+      const assetToDelete = assets.find(a => a.id === assetId);
+      
       assetRef.remove()
         .then(() => {
-           const imagePath = assets.find(a => a.id === assetId)?.photoURL;
-           if(imagePath) {
-             const imageRef = storage.refFromURL(imagePath);
-             imageRef.delete().catch(err => console.error("Error deleting image:", err));
+           if(assetToDelete && assetToDelete.photoURL) {
+             try {
+                const imageRef = storage.refFromURL(assetToDelete.photoURL);
+                imageRef.delete().catch(err => console.error("Error deleting image:", err));
+             } catch (e) {
+                console.error("Could not delete image from storage, likely already deleted or invalid URL:", e);
+             }
            }
         })
         .catch((error) => {
@@ -97,5 +101,4 @@ const App = () => {
   );
 };
 
-// Fix: Add default export for the App component.
 export default App;

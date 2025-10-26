@@ -1,4 +1,3 @@
-// Fix: Add imports for React and the ParkAsset type.
 import React from 'react';
 import { ParkAsset } from '../types';
 
@@ -7,7 +6,7 @@ interface AssetRegistrationProps {
   onAssetUpdated: () => void;
 }
 
-const AssetRegistration = ({ assetToEdit, onAssetUpdated }: AssetRegistrationProps) => {
+export const AssetRegistration = ({ assetToEdit, onAssetUpdated }: AssetRegistrationProps) => {
   const { database, storage } = window as any;
   const [formData, setFormData] = React.useState({
     assetName: '', assetType: '', status: 'good', description: ''
@@ -58,7 +57,11 @@ const AssetRegistration = ({ assetToEdit, onAssetUpdated }: AssetRegistrationPro
           videoRef.current.srcObject = stream;
         }
       })
-      .catch(err => console.error(err));
+      .catch(err => {
+          console.error(err);
+          alert("카메라에 접근할 수 없습니다. 권한을 확인해주세요.");
+          setIsCameraOpen(false);
+      });
   };
   
   const handleCapture = () => {
@@ -142,9 +145,14 @@ const AssetRegistration = ({ assetToEdit, onAssetUpdated }: AssetRegistrationPro
        {isCameraOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex flex-col items-center justify-center z-50">
           <video ref={videoRef} autoPlay className="w-full max-w-lg h-auto rounded-lg"></video>
-          <button onClick={handleCapture} className="mt-4 px-6 py-3 bg-green-500 text-white font-bold rounded-lg shadow-lg hover:bg-green-600">
-            촬영하기
-          </button>
+          <div className="flex space-x-4 mt-4">
+            <button onClick={handleCapture} className="px-6 py-3 bg-green-500 text-white font-bold rounded-lg shadow-lg hover:bg-green-600">
+                촬영하기
+            </button>
+            <button onClick={() => setIsCameraOpen(false)} className="px-6 py-3 bg-red-500 text-white font-bold rounded-lg shadow-lg hover:bg-red-600">
+                취소
+            </button>
+          </div>
         </div>
       )}
 
@@ -186,6 +194,3 @@ const AssetRegistration = ({ assetToEdit, onAssetUpdated }: AssetRegistrationPro
     </div>
   );
 };
-
-// Fix: Add default export for the component.
-export default AssetRegistration;
