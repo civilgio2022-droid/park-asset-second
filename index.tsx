@@ -1,8 +1,10 @@
+// Fix: Add imports for React, ReactDOM, and App to resolve module errors.
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.tsx';
+import App from './App';
 
-const domNode = document.getElementById('root');
-// FIX: Import ReactDOM from 'react-dom/client' to resolve UMD global and createRoot errors.
-const root = ReactDOM.createRoot(domNode!);
-root.render(<App />);
+const container = document.getElementById('root');
+if (container) {
+  const root = ReactDOM.createRoot(container);
+  root.render(<App />);
+}

@@ -1,11 +1,12 @@
+// Fix: Export the ParkAsset interface to make it available for import.
 export interface ParkAsset {
   id: string;
-  name: string;
-  type: string;
+  assetName: string;
+  assetType: string;
   status: string;
   description: string;
-  photoUrl: string;
-  mapUrl: string;
+  photoURL: string;
+  mapURL: string;
   latitude: number;
   longitude: number;
   registrationDate: string;

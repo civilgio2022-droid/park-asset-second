@@ -1,148 +1,101 @@
-// FIX: 'React' refers to a UMD global, but the current file is a module. Consider adding an import instead.
-import React, { useState, useEffect } from 'react';
-// FIX: 'firebase' refers to a UMD global, but the current file is a module. Consider adding an import instead.
-import firebase from 'firebase/compat/app';
-import 'firebase/compat/database';
-import 'firebase/compat/storage';
-import { ParkAsset } from './types.ts';
-import AssetRegistration from './components/AssetRegistration.tsx';
-import AssetInquiry from './components/AssetInquiry.tsx';
-import ReportGeneration from './components/ReportGeneration.tsx';
+// Fix: Add imports for React, child components, and the ParkAsset type.
+import React from 'react';
+import AssetRegistration from './components/AssetRegistration';
+import AssetInquiry from './components/AssetInquiry';
+import ReportGeneration from './components/ReportGeneration';
+import { ParkAsset } from './types';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCrbVL1KkJ7x7_BRt8vQQrmLm90O2GVAqo",
-  authDomain: "park-asset-management.firebaseapp.com",
-  databaseURL: "https://park-asset-management-default-rtdb.firebaseio.com",
-  projectId: "park-asset-management",
-  storageBucket: "park-asset-management.firebasestorage.app",
-  messagingSenderId: "1097483381623",
-  appId: "1:1097483381623:web:c2d2f1f285714f1b664f72",
-  measurementId: "G-Q2JNB48PDZ"
+const App = () => {
+  const { database, storage } = window as any;
+  const [stage, setStage] = React.useState('registration');
+  const [assets, setAssets] = React.useState<ParkAsset[]>([]);
+  const [assetToEdit, setAssetToEdit] = React.useState<ParkAsset | null>(null);
+
+  React.useEffect(() => {
+    const assetsRef = database.ref('assets');
+    const listener = assetsRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      const loadedAssets: ParkAsset[] = [];
+      for (const key in data) {
+        loadedAssets.push({
+          id: key,
+          ...data[key],
+        });
+      }
+      setAssets(loadedAssets.sort((a, b) => new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime()));
+    });
+
+    return () => assetsRef.off('value', listener);
+  }, []);
+
+  const handleSetAssetToEdit = (asset: ParkAsset) => {
+    setAssetToEdit(asset);
+    setStage('registration');
+  };
+
+  const handleClearAssetToEdit = () => {
+    setAssetToEdit(null);
+  };
+  
+  const handleAssetUpdated = () => {
+      setAssetToEdit(null);
+      setStage('inquiry');
+  }
+
+  const handleDeleteAsset = (assetId: string) => {
+    if (window.confirm('정말로 이 자산을 삭제하시겠습니까?')) {
+      const assetRef = database.ref(`assets/${assetId}`);
+      assetRef.remove()
+        .then(() => {
+           const imagePath = assets.find(a => a.id === assetId)?.photoURL;
+           if(imagePath) {
+             const imageRef = storage.refFromURL(imagePath);
+             imageRef.delete().catch(err => console.error("Error deleting image:", err));
+           }
+        })
+        .catch((error) => {
+          console.error('Error removing asset: ', error);
+          alert('자산 삭제에 실패했습니다.');
+        });
+    }
+  };
+
+
+  return (
+    <div className="bg-gray-100 min-h-screen font-sans">
+      <div className="container mx-auto p-4">
+        <header className="bg-white shadow-md rounded-lg p-6 mb-8">
+          <h1 className="text-4xl font-bold text-gray-800 text-center">공원 자산 관리 시스템</h1>
+          <nav className="flex justify-center space-x-4 mt-4 border-t pt-4">
+            {['registration', 'inquiry', 'report'].map((s) => (
+              <button
+                key={s}
+                onClick={() => {
+                  setStage(s);
+                  handleClearAssetToEdit();
+                }}
+                className={`px-6 py-2 rounded-md text-lg font-semibold transition-all duration-300 ${
+                  stage === s
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {s === 'registration' && '자산 등록/수정'}
+                {s === 'inquiry' && '자산 조회'}
+                {s === 'report' && '보고서 출력'}
+              </button>
+            ))}
+          </nav>
+        </header>
+        <main className="bg-white shadow-md rounded-lg p-8">
+          {stage === 'registration' && <AssetRegistration assetToEdit={assetToEdit} onAssetUpdated={handleAssetUpdated} />}
+          {stage === 'inquiry' && <AssetInquiry assets={assets} onEdit={handleSetAssetToEdit} onDelete={handleDeleteAsset} />}
+          {stage === 'report' && <ReportGeneration assets={assets} />}
+        </main>
+      </div>
+    </div>
+  );
 };
 
-firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
-const storage = firebase.storage();
-
-function App() {
-    const [activeTab, setActiveTab] = useState('register');
-    const [assets, setAssets] = useState<ParkAsset[]>([]);
-    const [assetToEdit, setAssetToEdit] = useState<ParkAsset | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-
-    useEffect(() => {
-        const assetsRef = database.ref('assets');
-        const listener = assetsRef.on('value', (snapshot) => {
-            const data = snapshot.val();
-            const loadedAssets: ParkAsset[] = [];
-            if (data) {
-                for (const key in data) {
-                    loadedAssets.push({
-                        id: key,
-                        ...data[key]
-                    });
-                }
-            }
-            setAssets(loadedAssets.sort((a, b) => new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime()));
-            setLoading(false);
-        }, (error) => {
-            console.error(error);
-            setError('데이터를 불러오는 데 실패했습니다.');
-            setLoading(false);
-        });
-
-        return () => assetsRef.off('value', listener);
-    }, []);
-    
-    const handleSaveAsset = (asset: Omit<ParkAsset, 'id'>, id: string | null) => {
-        if (id) {
-            database.ref(`assets/${id}`).update(asset)
-            .then(() => {
-                 setAssetToEdit(null);
-                 setActiveTab('inquiry');
-            })
-            .catch(err => setError("자산 업데이트 실패: " + err.message));
-        } else {
-             database.ref('assets').push(asset)
-            .then(() => {
-                setActiveTab('inquiry');
-            })
-            .catch(err => setError("자산 등록 실패: " + err.message));
-        }
-    };
-    
-    const handleDeleteAsset = (id: string) => {
-        const assetToDelete = assets.find(asset => asset.id === id);
-        if (assetToDelete) {
-             const imageRef = storage.refFromURL(assetToDelete.photoUrl);
-             
-             imageRef.delete().then(() => {
-                database.ref(`assets/${id}`).remove();
-             }).catch(error => {
-                if (error.code === 'storage/object-not-found') {
-                    console.warn("스토리지에 이미지가 없어 데이터베이스 항목만 삭제합니다.");
-                    database.ref(`assets/${id}`).remove();
-                } else {
-                    console.error("이미지 삭제 실패:", error);
-                    setError("이미지 삭제에 실패했습니다. 자산 정보를 삭제할 수 없습니다.");
-                }
-            });
-        }
-    };
-
-    const handleEditAsset = (asset: ParkAsset) => {
-        setAssetToEdit(asset);
-        setActiveTab('register');
-    };
-
-    const renderContent = () => {
-        switch (activeTab) {
-            case 'register':
-                return <AssetRegistration 
-                    onSave={handleSaveAsset} 
-                    assetToEdit={assetToEdit} 
-                    setAssetToEdit={setAssetToEdit}
-                    storage={storage} 
-                />;
-            case 'inquiry':
-                return <AssetInquiry 
-                    assets={assets}
-                    onEdit={handleEditAsset}
-                    onDelete={handleDeleteAsset}
-                    loading={loading}
-                 />;
-            case 'report':
-                return <ReportGeneration assets={assets} />;
-            default:
-                return null;
-        }
-    };
-
-    return (
-        <div className="container mx-auto p-4 max-w-4xl">
-            <header className="text-center my-6">
-                <h1 className="text-4xl font-bold text-gray-800">공원 자산 관리 시스템</h1>
-                <p className="text-gray-500 mt-2">공원 자산을 효율적으로 등록, 조회하고 보고서를 생성하세요.</p>
-            </header>
-
-            {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">{error}</div>}
-
-            <div className="bg-white rounded-lg shadow-lg">
-                <nav className="flex border-b">
-                    <button onClick={() => setActiveTab('register')} className={`flex-1 py-4 px-2 text-center text-gray-600 border-b-4 tab-button ${activeTab === 'register' ? 'active' : 'border-transparent hover:border-gray-300'}`}>자산 등록</button>
-                    <button onClick={() => setActiveTab('inquiry')} className={`flex-1 py-4 px-2 text-center text-gray-600 border-b-4 tab-button ${activeTab === 'inquiry' ? 'active' : 'border-transparent hover:border-gray-300'}`}>자산 조회</button>
-                    <button onClick={() => setActiveTab('report')} className={`flex-1 py-4 px-2 text-center text-gray-600 border-b-4 tab-button ${activeTab === 'report' ? 'active' : 'border-transparent hover:border-gray-300'}`}>보고서 출력</button>
-                </nav>
-                <main className="p-6">
-                    {renderContent()}
-                </main>
-            </div>
-             <footer className="text-center mt-8 text-gray-500 text-sm">
-                &copy; 2024 Park Asset Management System. All rights reserved.
-            </footer>
-        </div>
-    );
-}
-
+// Fix: Add default export for the App component.
 export default App;
