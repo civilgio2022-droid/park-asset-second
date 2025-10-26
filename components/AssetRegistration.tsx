@@ -1,247 +1,216 @@
+// FIX: 'React' refers to a UMD global, but the current file is a module. Consider adding an import instead.
 import React, { useState, useEffect, useRef } from 'react';
 import { ParkAsset } from '../types.ts';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface AssetRegistrationProps {
-  onAddAsset: (asset: Omit<ParkAsset, 'id'>) => Promise<void>;
-  onUpdateAsset: (asset: ParkAsset) => Promise<void>;
-  storage: any; // Firebase Storage instance
-  assetToEdit: ParkAsset | null;
-  onCancelEdit: () => void;
+    onSave: (asset: Omit<ParkAsset, 'id'>, id: string | null) => void;
+    assetToEdit: ParkAsset | null;
+    setAssetToEdit: (asset: ParkAsset | null) => void;
+    storage: any;
 }
 
-const AssetRegistration: React.FC<AssetRegistrationProps> = ({ onAddAsset, onUpdateAsset, storage, assetToEdit, onCancelEdit }) => {
-  const [formData, setFormData] = useState({
-    assetName: '', assetType: '', status: '양호', description: '', acquisitionDate: '',
-  });
-  const [location, setLocation] = useState<{ lat: number | null; lon: number | null }>({ lat: null, lon: null });
-  const [photo, setPhoto] = useState<string | null>(null); // data URL for preview
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+function AssetRegistration({ onSave, assetToEdit, setAssetToEdit, storage }: AssetRegistrationProps) {
+    const [name, setName] = useState('');
+    const [type, setType] = useState('');
+    const [status, setStatus] = useState('good');
+    const [description, setDescription] = useState('');
+    const [photo, setPhoto] = useState<File | null>(null);
+    const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+    const [mapUrl, setMapUrl] = useState('');
+    const [latitude, setLatitude] = useState<number | null>(null);
+    const [longitude, setLongitude] = useState<number | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showCamera, setShowCamera] = useState(false);
+    
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
-    if (assetToEdit) {
-      setFormData({
-        assetName: assetToEdit.assetName,
-        assetType: assetToEdit.assetType,
-        status: assetToEdit.status,
-        description: assetToEdit.description,
-        acquisitionDate: assetToEdit.acquisitionDate,
-      });
-      setLocation({ lat: assetToEdit.latitude, lon: assetToEdit.longitude });
-      setPhoto(assetToEdit.imageUrl);
-      setPhotoFile(null); // Editing starts without a new file
-    } else {
-      // Reset form when not editing
-      handleCancel();
-    }
-  }, [assetToEdit]);
+    useEffect(() => {
+        if (assetToEdit) {
+            setName(assetToEdit.name);
+            setType(assetToEdit.type);
+            setStatus(assetToEdit.status);
+            setDescription(assetToEdit.description);
+            setPhotoPreview(assetToEdit.photoUrl);
+            setMapUrl(assetToEdit.mapUrl);
+            setLatitude(assetToEdit.latitude);
+            setLongitude(assetToEdit.longitude);
+            setPhoto(null);
+        } else {
+            resetForm();
+        }
+    }, [assetToEdit]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-  
-  const openCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setIsCameraOpen(true);
-        // Get location while camera is opening
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            setLocation({
-              lat: position.coords.latitude,
-              lon: position.coords.longitude,
-            });
-          },
-          (err) => {
-            console.error("Error getting location: ", err);
-            alert("위치 정보를 가져올 수 없습니다. 브라우저 설정을 확인해주세요.");
-          },
-          { enableHighAccuracy: true }
-        );
-      }
-    } catch (err) {
-      console.error("Error accessing camera: ", err);
-      alert("카메라에 접근할 수 없습니다. 권한을 확인해주세요.");
-    }
-  };
-
-  const takePicture = () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext('2d')?.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-      const dataUrl = canvas.toDataURL('image/jpeg');
-      setPhoto(dataUrl);
-      canvas.toBlob(blob => {
-          if (blob) {
-              setPhotoFile(new File([blob], `asset_${Date.now()}.jpg`, { type: 'image/jpeg' }));
-          }
-      }, 'image/jpeg', 0.95);
-      closeCamera();
-    }
-  };
-  
-  const closeCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-    setIsCameraOpen(false);
-  };
-  
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!photo || !formData.acquisitionDate) {
-        alert("현장사진과 취득일자는 필수입니다.");
-        return;
-    }
-    setIsSubmitting(true);
-    let imageUrl = assetToEdit?.imageUrl || ''; // Keep old image url unless new one is uploaded
-
-    if (photoFile) { // A new photo was taken
-        const imageRef = storageRef(storage, `assets/${Date.now()}_${photoFile.name}`);
-        await uploadBytes(imageRef, photoFile);
-        imageUrl = await getDownloadURL(imageRef);
-    }
-
-    const assetData = {
-        ...formData,
-        imageUrl,
-        latitude: location.lat,
-        longitude: location.lon,
+    const resetForm = () => {
+        setName('');
+        setType('');
+        setStatus('good');
+        setDescription('');
+        setPhoto(null);
+        setPhotoPreview(null);
+        setMapUrl('');
+        setLatitude(null);
+        setLongitude(null);
+        setAssetToEdit(null);
     };
     
-    try {
-        if(assetToEdit) {
-            await onUpdateAsset({ ...assetData, id: assetToEdit.id });
-            alert('자산이 성공적으로 수정되었습니다.');
-        } else {
-            await onAddAsset(assetData);
-            alert('자산이 성공적으로 등록되었습니다.');
+    const handleStartCamera = async () => {
+        setShowCamera(true);
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+            }
+        } catch (err) {
+            console.error("카메라 접근 실패:", err);
+            alert("카메라에 접근할 수 없습니다. 권한을 확인해주세요.");
+            setShowCamera(false);
         }
-        handleCancel();
-    } catch (error) {
-        console.error("Error saving asset: ", error);
-        alert("저장 중 오류가 발생했습니다.");
-    } finally {
+    };
+    
+    const handleCapture = () => {
+        if (videoRef.current && canvasRef.current) {
+            const context = canvasRef.current.getContext('2d');
+            canvasRef.current.width = videoRef.current.videoWidth;
+            canvasRef.current.height = videoRef.current.videoHeight;
+            context?.drawImage(videoRef.current, 0, 0, videoRef.current.videoWidth, videoRef.current.videoHeight);
+            
+            canvasRef.current.toBlob(blob => {
+                if (blob) {
+                    setPhoto(new File([blob], "capture.jpg", { type: "image/jpeg" }));
+                    setPhotoPreview(URL.createObjectURL(blob));
+                }
+            }, 'image/jpeg');
+
+            handleStopCamera();
+            
+            navigator.geolocation.getCurrentPosition(position => {
+                const { latitude, longitude } = position.coords;
+                setLatitude(latitude);
+                setLongitude(longitude);
+                // Naver Static Map API (Note: Requires a valid client ID in index.html)
+                const naverMapURL = `https://naveropenapi.apigw.ntruss.com/map-static/v2/raster?w=300&h=300&center=${longitude},${latitude}&level=16&markers=type:t|size:mid|pos:${longitude} ${latitude}|label:${encodeURIComponent(name || '현위치')}`;
+                setMapUrl(naverMapURL);
+            }, error => {
+                console.error("Geolocation error:", error);
+                alert("위치 정보를 가져올 수 없습니다.");
+            });
+        }
+    };
+    
+    const handleStopCamera = () => {
+        if (videoRef.current && videoRef.current.srcObject) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            stream.getTracks().forEach(track => track.stop());
+            videoRef.current.srcObject = null;
+        }
+        setShowCamera(false);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!name || !type || !status || !description || (!photo && !assetToEdit)) {
+            alert('모든 필드를 채워주세요.');
+            return;
+        }
+        setIsSubmitting(true);
+
+        let finalPhotoUrl = assetToEdit?.photoUrl || '';
+        if (photo) {
+            const filePath = `assets/${Date.now()}_${photo.name}`;
+            const fileRef = storage.ref(filePath);
+            try {
+                const snapshot = await fileRef.put(photo);
+                finalPhotoUrl = await snapshot.ref.getDownloadURL();
+            } catch (error) {
+                console.error("이미지 업로드 실패:", error);
+                alert("이미지 업로드에 실패했습니다.");
+                setIsSubmitting(false);
+                return;
+            }
+        }
+        
+        const assetData = {
+            name,
+            type,
+            status,
+            description,
+            photoUrl: finalPhotoUrl,
+            mapUrl,
+            latitude: latitude ?? 0,
+            longitude: longitude ?? 0,
+            registrationDate: assetToEdit?.registrationDate || new Date().toISOString()
+        };
+        
+        onSave(assetData, assetToEdit ? assetToEdit.id : null);
+        resetForm();
         setIsSubmitting(false);
-    }
-  };
-  
-  const handleCancel = () => {
-      setFormData({ assetName: '', assetType: '', status: '양호', description: '', acquisitionDate: '' });
-      setLocation({ lat: null, lon: null });
-      setPhoto(null);
-      setPhotoFile(null);
-      onCancelEdit();
-  };
+    };
 
-  const NaverStaticMap: React.FC<{ lat: number; lon: number }> = ({ lat, lon }) => {
-    const naverClientId = 'YOUR_NAVER_CLIENT_ID'; // Replace with your Naver Maps Client ID
-    if (!naverClientId || naverClientId === 'YOUR_NAVER_CLIENT_ID') {
-        return <div className="text-center p-4 bg-yellow-100 rounded-md">네이버 지도 Client ID를 설정해주세요.</div>
-    }
-    const mapUrl = `https://naveropenapi.apigw.ntruss.com/map-static/v2/raster?w=400&h=300&center=${lon},${lat}&level=16&markers=type:t|size:mid|pos:${lon}%20${lat}|label:%EC%9E%90%EC%82%B0%20%EC%9C%84%EC%B9%98&X-NCP-APIGW-API-KEY-ID=${naverClientId}`;
-    return <img src={mapUrl} alt="위치도" className="w-full h-auto rounded-lg border" />;
-  };
-
-  const renderInputField = (id: string, label: string, type = 'text', required = true) => (
-    <div>
-        <label htmlFor={id} className="block text-sm font-medium text-gray-700">{label}</label>
-        <input
-            type={type}
-            id={id}
-            name={id}
-            value={formData[id as keyof typeof formData] || ''}
-            onChange={handleChange}
-            required={required}
-            className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-        />
-    </div>
-  );
-
-  return (
-    <div>
-        {isCameraOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex flex-col items-center justify-center z-50">
-            <video ref={videoRef} autoPlay className="w-full max-w-lg h-auto"></video>
-            <div className="mt-4 space-x-4">
-                <button onClick={takePicture} className="px-6 py-3 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700">촬영</button>
-                <button onClick={closeCamera} className="px-6 py-3 bg-gray-600 text-white rounded-lg shadow-md hover:bg-gray-700">취소</button>
-            </div>
-            <canvas ref={canvasRef} className="hidden"></canvas>
-        </div>
-      )}
-      <h2 className="text-xl font-semibold mb-4 text-gray-800">{assetToEdit ? '자산 수정' : '자산 등록'}</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {renderInputField('assetName', '자산명')}
-        {renderInputField('assetType', '자산 종류')}
+    return (
         <div>
-            <label htmlFor="status" className="block text-sm font-medium text-gray-700">상태</label>
-            <select
-                id="status"
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            >
-                <option>양호</option>
-                <option>수리 필요</option>
-                <option>불량</option>
-                <option>폐기 대상</option>
-            </select>
-        </div>
-        <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700">설명</label>
-            <textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                required
-                rows={4}
-                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            />
-        </div>
-        {renderInputField('acquisitionDate', '취득일자', 'date')}
-        
-        <div className="space-y-2">
-            <h3 className="text-sm font-medium text-gray-700">현장사진</h3>
-            <button type="button" onClick={openCamera} className="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">사진 촬영</button>
-            {photo && <img src={photo} alt="현장사진" className="mt-2 w-full h-auto rounded-lg border" />}
-        </div>
-        
-        <div className="space-y-2">
-            <h3 className="text-sm font-medium text-gray-700">위치도 및 좌표</h3>
-            {location.lat && location.lon ? (
-                 <>
-                    <NaverStaticMap lat={location.lat} lon={location.lon} />
-                    <div className="grid grid-cols-2 gap-4 mt-2">
-                        {renderInputField('latitude', '위도', 'number')}
-                        {renderInputField('longitude', '경도', 'number')}
+             {showCamera && (
+                <div className="fixed inset-0 bg-black bg-opacity-75 flex flex-col items-center justify-center z-50">
+                    <video ref={videoRef} autoPlay className="w-full max-w-lg h-auto"></video>
+                    <canvas ref={canvasRef} className="hidden"></canvas>
+                    <div className="mt-4 flex gap-4">
+                        <button onClick={handleCapture} className="px-6 py-3 bg-green-500 text-white rounded-lg shadow-md hover:bg-green-600">촬영</button>
+                        <button onClick={handleStopCamera} className="px-6 py-3 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-600">취소</button>
                     </div>
-                 </>
-            ) : <p className="text-gray-500 text-sm">사진 촬영 시 위치 정보가 자동으로 등록됩니다.</p>}
-        </div>
+                </div>
+            )}
+            <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label htmlFor="name" className="block text-sm font-medium text-gray-700">자산명</label>
+                        <input type="text" id="name" value={name} onChange={e => setName(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500" required />
+                    </div>
+                     <div>
+                        <label htmlFor="type" className="block text-sm font-medium text-gray-700">자산 종류</label>
+                        <input type="text" id="type" value={type} onChange={e => setType(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500" required />
+                    </div>
+                </div>
+                <div>
+                    <label htmlFor="status" className="block text-sm font-medium text-gray-700">상태</label>
+                    <select id="status" value={status} onChange={e => setStatus(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500" required>
+                        <option value="good">양호</option>
+                        <option value="fair">보통</option>
+                        <option value="poor">불량</option>
+                    </select>
+                </div>
+                <div>
+                    <label htmlFor="description" className="block text-sm font-medium text-gray-700">설명</label>
+                    <textarea id="description" value={description} onChange={e => setDescription(e.target.value)} rows={4} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500" required></textarea>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">현장 사진</label>
+                    <div className="mt-2">
+                        <button type="button" onClick={handleStartCamera} className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">카메라 열기</button>
+                        {photoPreview && <img src={photoPreview} alt="현장 사진" className="mt-4 max-h-48 rounded-md shadow-sm"/>}
+                    </div>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">위치도</label>
+                     <div className="mt-2 p-2 border rounded-md">
+                        {mapUrl ? <img src={mapUrl} alt="위치도" className="w-full h-auto rounded-md"/> : <p className="text-gray-500">사진 촬영 시 위치가 자동으로 기록됩니다.</p>}
+                        {latitude && longitude && (
+                            <div className="mt-2 text-sm text-gray-600">
+                                <p>위도: {latitude.toFixed(6)}</p>
+                                <p>경도: {longitude.toFixed(6)}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
 
-        <div className="flex justify-end space-x-2 pt-4">
-          {assetToEdit && <button type="button" onClick={handleCancel} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">취소</button>}
-          <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-300">
-            {isSubmitting ? '저장 중...' : (assetToEdit ? '수정 완료' : '등록하기')}
-          </button>
+                <div className="flex justify-end gap-4 pt-4">
+                    <button type="button" onClick={resetForm} disabled={isSubmitting} className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50">취소</button>
+                    <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:bg-emerald-400">
+                        {isSubmitting ? '저장 중...' : (assetToEdit ? '수정 완료' : '자산 등록')}
+                    </button>
+                </div>
+            </form>
         </div>
-      </form>
-    </div>
-  );
-};
+    );
+}
+
 export default AssetRegistration;

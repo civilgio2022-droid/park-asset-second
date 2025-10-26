@@ -11,7 +11,10 @@
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "firebase": "^12.4.0"
+    "firebase": "^12.4.0",
+    "jspdf": "^3.0.3",
+    "jspdf-autotable": "^5.0.2",
+    "papaparse": "^5.5.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

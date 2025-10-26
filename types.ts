@@ -1,11 +1,12 @@
 export interface ParkAsset {
-  id: string; // Firebase key
-  assetName: string;
-  assetType: string;
+  id: string;
+  name: string;
+  type: string;
   status: string;
   description: string;
-  acquisitionDate: string;
-  imageUrl: string; // URL from Firebase Storage
-  latitude: number | null;
-  longitude: number | null;
+  photoUrl: string;
+  mapUrl: string;
+  latitude: number;
+  longitude: number;
+  registrationDate: string;
 }
