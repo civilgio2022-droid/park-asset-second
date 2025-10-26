@@ -1,3 +1,4 @@
+// Fix: Add missing imports for React and ParkAsset type.
 import React from 'react';
 import { ParkAsset } from '../types';
 
@@ -7,7 +8,7 @@ interface AssetInquiryProps {
   onDelete: (assetId: string) => void;
 }
 
-export const AssetInquiry = ({ assets, onEdit, onDelete }: AssetInquiryProps) => {
+const AssetInquiry = ({ assets, onEdit, onDelete }: AssetInquiryProps) => {
   const [filter, setFilter] = React.useState({ year: '', month: '', day: '' });
   
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,3 +66,6 @@ export const AssetInquiry = ({ assets, onEdit, onDelete }: AssetInquiryProps) =>
     </div>
   );
 };
+
+// Fix: Export the AssetInquiry component so it can be imported in App.tsx.
+export default AssetInquiry;

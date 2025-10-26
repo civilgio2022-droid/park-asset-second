@@ -1,7 +1,8 @@
+// Fix: Add missing imports for React, child components, and ParkAsset type.
 import React from 'react';
-import { AssetRegistration } from './components/AssetRegistration';
-import { AssetInquiry } from './components/AssetInquiry';
-import { ReportGeneration } from './components/ReportGeneration';
+import AssetInquiry from './components/AssetInquiry';
+import AssetRegistration from './components/AssetRegistration';
+import ReportGeneration from './components/ReportGeneration';
 import { ParkAsset } from './types';
 
 const App = () => {
@@ -101,4 +102,5 @@ const App = () => {
   );
 };
 
+// Fix: Export the App component so it can be imported in index.tsx.
 export default App;

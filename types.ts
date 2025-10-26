@@ -1,4 +1,4 @@
-export interface ParkAsset {
+interface ParkAsset {
   id: string;
   assetName: string;
   assetType: string;

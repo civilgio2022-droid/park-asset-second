@@ -1,3 +1,4 @@
+// Fix: Add missing imports for React and ParkAsset type.
 import React from 'react';
 import { ParkAsset } from '../types';
 
@@ -6,7 +7,7 @@ interface AssetRegistrationProps {
   onAssetUpdated: () => void;
 }
 
-export const AssetRegistration = ({ assetToEdit, onAssetUpdated }: AssetRegistrationProps) => {
+const AssetRegistration = ({ assetToEdit, onAssetUpdated }: AssetRegistrationProps) => {
   const { database, storage } = window as any;
   const [formData, setFormData] = React.useState({
     assetName: '', assetType: '', status: 'good', description: ''
@@ -194,3 +195,6 @@ export const AssetRegistration = ({ assetToEdit, onAssetUpdated }: AssetRegistra
     </div>
   );
 };
+
+// Fix: Export the AssetRegistration component so it can be imported in App.tsx.
+export default AssetRegistration;

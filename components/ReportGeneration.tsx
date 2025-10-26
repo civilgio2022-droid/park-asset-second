@@ -1,16 +1,19 @@
+// Fix: Add missing imports for React, ParkAsset type, and third-party libraries.
 import React from 'react';
-import { ParkAsset } from '../types';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import Papa from 'papaparse';
+import { ParkAsset } from '../types';
 
 interface ReportGenerationProps {
   assets: ParkAsset[];
 }
 
-export const ReportGeneration = ({ assets }: ReportGenerationProps) => {
+const ReportGeneration = ({ assets }: ReportGenerationProps) => {
   const [startDate, setStartDate] = React.useState('');
   const [endDate, setEndDate] = React.useState('');
+  // Fix: The 'jspdf' property was accessed from the global 'window' object, which is not available in a module.
+  // const { jsPDF } = window.jspdf;
 
   const getFilteredAssets = () => {
     if (!startDate || !endDate) return assets;
@@ -25,7 +28,7 @@ export const ReportGeneration = ({ assets }: ReportGenerationProps) => {
   };
   
   const handlePdfDownload = () => {
-    // FIX: Use imported jsPDF instead of a global from window.
+    // Fix: Instantiate jsPDF from the imported module.
     const doc = new jsPDF();
     const tableData = getFilteredAssets().map(asset => [
       asset.assetName,
@@ -35,9 +38,6 @@ export const ReportGeneration = ({ assets }: ReportGenerationProps) => {
       `${asset.latitude?.toFixed(4)}, ${asset.longitude?.toFixed(4)}`
     ]);
 
-    // Add a font that supports Korean
-    // For this example, we assume a font file is available, but in a real scenario, you'd need to provide one.
-    // As a workaround for environments without custom fonts, we'll proceed without it, which may result in broken characters for Korean.
     doc.setFont("Helvetica", "normal"); 
     
     doc.text("공원 자산 보고서", 14, 20);
@@ -45,8 +45,6 @@ export const ReportGeneration = ({ assets }: ReportGenerationProps) => {
         head: [['자산명', '종류', '상태', '등록일', '좌표']],
         body: tableData,
         startY: 30,
-        // Add font style for the table to support Korean if possible
-        // styles: { font: "YourKoreanFontName" } 
     });
     doc.save('park_asset_report.pdf');
   };
@@ -64,6 +62,7 @@ export const ReportGeneration = ({ assets }: ReportGenerationProps) => {
         '지도URL': asset.mapURL,
     }));
     
+    // Fix: 'Papa' was accessed as a global, but it needs to be imported as a module.
     const csv = Papa.unparse(csvData);
     const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
@@ -108,3 +107,6 @@ export const ReportGeneration = ({ assets }: ReportGenerationProps) => {
     </div>
   );
 };
+
+// Fix: Export the ReportGeneration component so it can be imported in App.tsx.
+export default ReportGeneration;
